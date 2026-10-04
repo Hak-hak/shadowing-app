@@ -128,9 +128,17 @@ ${rawText}
 
         const parsed = JSON.parse(rawJson);
 
-        // Validate and ensure terminal punctuation on last word of each sentence
+        // Validate and ensure terminal punctuation on last word and Vietnamese translation
         if (Array.isArray(parsed.sentences)) {
           parsed.sentences.forEach((s: any) => {
+            if (
+              !s.vietnamese ||
+              !s.vietnamese.trim() ||
+              s.vietnamese.trim().toLowerCase() === s.english.trim().toLowerCase()
+            ) {
+              s.vietnamese = translateSentenceHeuristic(s.english);
+            }
+
             if (Array.isArray(s.words) && s.words.length > 0) {
               const lastWord = s.words[s.words.length - 1];
               if (!lastWord.punctuation || !/[.?!]$/.test(lastWord.punctuation)) {

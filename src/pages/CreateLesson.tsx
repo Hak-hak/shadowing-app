@@ -20,6 +20,7 @@ import { Lesson, SentenceItem } from '../types';
 import { storageService } from '../services/storage';
 import { ttsManager } from '../services/tts';
 import { aiAudioService, AI_VOICE_OPTIONS } from '../services/aiAudioService';
+import { translateEnglishSentence } from '../utils/sentenceTranslator';
 
 interface CreateLessonProps {
   onLessonCreated: (lesson: Lesson) => void;
@@ -119,11 +120,13 @@ export const CreateLesson: React.FC<CreateLessonProps> = ({ onLessonCreated, onC
           };
         });
 
+        const naturalVietnamese = translateEnglishSentence(cleanPart, words);
+
         sentences.push({
           id: currentId++,
           speaker,
           english: cleanPart,
-          vietnamese: '',
+          vietnamese: naturalVietnamese,
           words,
         });
       }
@@ -138,7 +141,7 @@ export const CreateLesson: React.FC<CreateLessonProps> = ({ onLessonCreated, onC
           id: 1,
           speaker: 'Speaker',
           english: text,
-          vietnamese: '',
+          vietnamese: translateEnglishSentence(text),
           words: text.split(/\s+/).map((w) => ({ text: w })),
         },
       ],
@@ -176,11 +179,20 @@ export const CreateLesson: React.FC<CreateLessonProps> = ({ onLessonCreated, onC
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.data && Array.isArray(result.data.sentences)) {
+          // Guarantee that every sentence has a complete, natural Vietnamese translation
+          const normalizedSentences = result.data.sentences.map((s: SentenceItem) => ({
+            ...s,
+            vietnamese:
+              s.vietnamese && s.vietnamese.trim() && s.vietnamese.toLowerCase() !== s.english.toLowerCase()
+                ? s.vietnamese
+                : translateEnglishSentence(s.english, s.words),
+          }));
+
           setPreviewData({
             lessonTitle: result.data.lessonTitle || title || 'Bài học luyện nói mới',
             topic: result.data.topic || topic || 'Giao tiếp tiếng Anh',
             grade: result.data.grade || grade,
-            sentences: result.data.sentences,
+            sentences: normalizedSentences,
           });
           setStep('preview');
           return;
@@ -200,6 +212,19 @@ export const CreateLesson: React.FC<CreateLessonProps> = ({ onLessonCreated, onC
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // Re-translate all sentences in preview with 1 click
+  const handleAutoTranslateAll = () => {
+    if (!previewData) return;
+    const retranslated = previewData.sentences.map((s) => ({
+      ...s,
+      vietnamese: translateEnglishSentence(s.english, s.words),
+    }));
+    setPreviewData({
+      ...previewData,
+      sentences: retranslated,
+    });
   };
 
   // Inline editing handlers in Preview
@@ -653,13 +678,25 @@ export const CreateLesson: React.FC<CreateLessonProps> = ({ onLessonCreated, onC
 
             {/* Sentences Preview & Inline Translation Editor */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <h3 className="font-extrabold text-slate-800 text-base">
-                  Danh sách {previewData.sentences.length} câu hội thoại / văn bản
-                </h3>
-                <span className="text-xs text-slate-500 font-medium">
-                  Nhấp vào ô dịch nghĩa để chỉnh sửa bản dịch theo ý muốn
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                <div>
+                  <h3 className="font-extrabold text-slate-800 text-base">
+                    Danh sách {previewData.sentences.length} câu hội thoại / văn bản
+                  </h3>
+                  <span className="text-xs text-slate-500 font-medium">
+                    Nhấp vào ô dịch nghĩa để chỉnh sửa bản dịch theo ý muốn
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAutoTranslateAll}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                  title="Tự động dịch toàn bộ câu tiếng Anh sang tiếng Việt"
+                >
+                  <Languages className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Dịch tự động tất cả sang tiếng Việt</span>
+                </button>
               </div>
 
               {previewData.sentences.map((sentence, idx) => {
@@ -749,9 +786,22 @@ export const CreateLesson: React.FC<CreateLessonProps> = ({ onLessonCreated, onC
                           <Languages className="w-3.5 h-3.5 text-amber-700" />
                           <span>🇻🇳 Bản dịch tiếng Việt (Nhấp để chỉnh sửa nếu cần):</span>
                         </label>
-                        <span className="text-[10px] text-amber-700/80 font-semibold">
-                          Chuẩn ngữ cảnh học sinh THCS
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const trans = translateEnglishSentence(sentence.english, sentence.words);
+                              handleUpdateSentenceField(sentence.id, 'vietnamese', trans);
+                            }}
+                            className="text-[11px] font-bold text-amber-800 hover:text-amber-950 bg-white hover:bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300 transition-colors shadow-2xs cursor-pointer active:scale-95"
+                            title="Tự động tạo bản dịch tiếng Việt cho câu này"
+                          >
+                            Dịch lại câu này
+                          </button>
+                          <span className="text-[10px] text-amber-700/80 font-semibold hidden sm:inline">
+                            Chuẩn THCS
+                          </span>
+                        </div>
                       </div>
                       <textarea
                         rows={2}

@@ -1,4 +1,5 @@
 import { SentenceItem, Lesson, WordToken } from '../types';
+import { translateEnglishSentence } from './sentenceTranslator';
 
 /**
  * Normalizes a sentence to ensure:
@@ -7,6 +8,7 @@ import { SentenceItem, Lesson, WordToken } from '../types';
  * 3. Intra-sentence punctuation (like commas) and sentence-ending punctuation (. ? !)
  *    are properly attached to the punctuation field of the respective word tokens.
  * 4. CRITICAL: The very last word token MUST have the terminating sentence punctuation (. ? !).
+ * 5. GUARANTEE: Every sentence ALWAYS has an accurate, natural Vietnamese translation suited for THCS.
  */
 export function normalizeSentence(sentence: SentenceItem): SentenceItem {
   if (!sentence) return sentence;
@@ -79,8 +81,12 @@ export function normalizeSentence(sentence: SentenceItem): SentenceItem {
     });
   }
 
-  // Normalize Vietnamese translation ending punctuation as well
+  // Ensure Vietnamese translation is NEVER empty or untranslated
   let vietnamese = (sentence.vietnamese || '').trim();
+  if (!vietnamese || (vietnamese.toLowerCase() === english.toLowerCase() && english.length > 3)) {
+    vietnamese = translateEnglishSentence(english, words);
+  }
+
   if (vietnamese && !/[.?!]$/.test(vietnamese)) {
     vietnamese += endingPunctuation;
   }

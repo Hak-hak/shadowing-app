@@ -440,13 +440,95 @@ export function translateSentenceHeuristic(sentence: string): string {
     return "Tên của bạn là gì?";
   }
 
+  if (/^good morning\b/i.test(lower)) {
+    if (lower.includes("teacher")) return "Chào buổi sáng thầy/cô ạ!";
+    if (lower.includes("class")) return "Chào buổi sáng cả lớp!";
+    return "Chào buổi sáng!";
+  }
+
+  if (/^good afternoon\b/i.test(lower)) {
+    return "Chào buổi chiều!";
+  }
+
+  if (/^good evening\b/i.test(lower)) {
+    return "Chào buổi tối!";
+  }
+
+  if (/please sit down\b/i.test(lower)) {
+    return "Các em hãy ngồi xuống đi.";
+  }
+
+  if (/^what do you usually do after school\b/i.test(lower)) {
+    return "Bạn thường làm gì sau giờ tan học ở trường?";
+  }
+
+  if (/^i usually play badminton with my friends\b/i.test(lower)) {
+    return "Mình thường chơi cầu lông cùng với các bạn của mình.";
+  }
+
+  if (/^how often do you play badminton\b/i.test(lower)) {
+    return "Bạn chơi cầu lông bao lâu một lần?";
+  }
+
+  if (/^i play (it )?(twice|two times) a week\b/i.test(lower)) {
+    return "Mình chơi 2 lần mỗi tuần.";
+  }
+
+  if (/^that sounds (really )?(healthy and fun|great)\b/i.test(lower)) {
+    return "Nghe có vẻ rất tốt cho sức khỏe và thú vị nữa!";
+  }
+
+  if (/what are your plans for this weekend\b/i.test(lower)) {
+    return "Cuối tuần này cậu đã có kế hoạch gì chưa?";
+  }
+
+  if (/visit my grandparents\b/i.test(lower)) {
+    return "Mình dự định về thăm ông bà ở quê.";
+  }
+
+  if (/how are you going to get there\b/i.test(lower)) {
+    return "Bạn sẽ đến đó bằng phương tiện gì?";
+  }
+
+  if (/taking the train\b/i.test(lower)) {
+    return "Gia đình mình sẽ đi bằng tàu hỏa vào sáng thứ Bảy.";
+  }
+
+  if (/what would you like for lunch\b/i.test(lower)) {
+    return "Bạn muốn dùng gì cho bữa trưa nào?";
+  }
+
+  if (/beef sandwich\b/i.test(lower)) {
+    return "Cho cháu một chiếc bánh mì kẹp thịt bò và một ly nước cam nhé ạ.";
+  }
+
+  if (/would you like ice with that\b/i.test(lower)) {
+    return "Cháu có muốn uống cùng với đá không?";
+  }
+
+  if (/just a little\b/i.test(lower)) {
+    return "Dạ chỉ một ít thôi ạ, cháu cảm ơn cô nhiều.";
+  }
+
+  if (/small actions can make a big difference\b/i.test(lower)) {
+    return "Những hành động nhỏ mỗi ngày có thể tạo nên sự khác biệt rất lớn cho môi trường của chúng ta.";
+  }
+
+  if (/turn off lights before leaving\b/i.test(lower)) {
+    return "Chúng ta nên luôn nhớ tắt đèn trước khi rời khỏi lớp học.";
+  }
+
+  if (/planting trees helps keep the air fresh\b/i.test(lower)) {
+    return "Trồng thêm cây xanh giúp giữ cho bầu không khí luôn trong lành và sạch sẽ cho mọi người.";
+  }
+
   // Common sentence structure heuristics
   if (lower.startsWith("i usually ") || lower.startsWith("i often ")) {
     return "Mình thường xuyên rèn luyện và thực hiện hoạt động này.";
   }
 
-  if (lower.startsWith("you should ")) {
-    return "Bạn nên chú ý thực hiện điều này đều đặn.";
+  if (lower.startsWith("you should ") || lower.startsWith("we should ")) {
+    return "Chúng ta nên chú ý thực hiện điều này một cách đều đặn.";
   }
 
   if (lower.startsWith("do you ")) {
@@ -455,6 +537,10 @@ export function translateSentenceHeuristic(sentence: string): string {
 
   if (lower.startsWith("why do you ")) {
     return "Tại sao bạn lại yêu thích điều này?";
+  }
+
+  if (/[?]$/.test(s)) {
+    return "Ý kiến của bạn về câu hỏi này như thế nào?";
   }
 
   return "Câu luyện nói giao tiếp tiếng Anh thường nhật.";

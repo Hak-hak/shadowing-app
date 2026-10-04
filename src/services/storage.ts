@@ -38,6 +38,8 @@ class StorageService {
         this.lessons = Array.isArray(parsed)
           ? parsed.map((l: Lesson) => normalizeLesson(l))
           : SAMPLE_LESSONS.map((l) => normalizeLesson(l));
+        // Ensure updated translations are preserved
+        this.saveLessons();
       } catch (e) {
         this.lessons = SAMPLE_LESSONS.map((l) => normalizeLesson(l));
       }
