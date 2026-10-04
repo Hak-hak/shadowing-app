@@ -1,10 +1,10 @@
 import { GoogleGenAI, GenerateContentParameters, GenerateContentResponse } from "@google/genai";
 
-// Supported models for text tasks in order of preference
+// Supported models for text tasks in order of preference (ultra-fast flash-lite first)
 export const FALLBACK_MODELS = [
+  "gemini-3.1-flash-lite",
   "gemini-3.8-flash",
   "gemini-flash-latest",
-  "gemini-3.1-flash-lite",
 ];
 
 export interface GeminiFallbackResult {
@@ -44,7 +44,9 @@ function isTransientError(error: any): boolean {
     message.includes("spikes in demand") ||
     message.includes("quota exceeded") ||
     message.includes("rate limit") ||
-    message.includes("overloaded")
+    message.includes("overloaded") ||
+    message.includes("timeout") ||
+    message.includes("timed out")
   ) {
     return true;
   }
@@ -53,8 +55,7 @@ function isTransientError(error: any): boolean {
 }
 
 /**
- * Execute generateContent with automatic retry on transient errors
- * and automatic fallback across valid Gemini models.
+ * Execute generateContent with tight timeout and automatic model fallback
  */
 export async function generateContentWithFallback(
   ai: GoogleGenAI,
@@ -63,42 +64,39 @@ export async function generateContentWithFallback(
   let lastError: any = null;
 
   for (const model of FALLBACK_MODELS) {
-    // Up to 2 attempts per model for transient errors
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        console.log(`[Gemini] Attempting generation with model '${model}' (attempt ${attempt + 1})...`);
-        const response: GenerateContentResponse = await ai.models.generateContent({
+    try {
+      console.log(`[Gemini] Attempting generation with model '${model}'...`);
+
+      // 10-second timeout per model to prevent gateway timeouts (504)
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Model '${model}' timed out after 10s`)), 10000)
+      );
+
+      const response: GenerateContentResponse = await Promise.race([
+        ai.models.generateContent({
           ...baseParams,
           model,
-        });
+        }),
+        timeoutPromise,
+      ]);
 
-        const text = response.text || "";
-        console.log(`[Gemini] Generation succeeded with model '${model}'.`);
-        return {
-          text,
-          modelUsed: model,
-        };
-      } catch (err: any) {
-        lastError = err;
-        const isTransient = isTransientError(err);
-        const errMsg = err?.message || String(err);
-
-        console.warn(
-          `[Gemini] Warning: Model '${model}' attempt ${attempt + 1} failed: ${errMsg.slice(0, 160)}...`
-        );
-
-        if (!isTransient) {
-          // If error is not transient (e.g. invalid request format or invalid auth), don't retry same model
-          break;
-        }
-
-        // Short exponential backoff before next attempt or next model
-        const backoffMs = attempt === 0 ? 600 : 1200;
-        await wait(backoffMs);
-      }
+      const text = response.text || "";
+      console.log(`[Gemini] Generation succeeded with model '${model}'.`);
+      return {
+        text,
+        modelUsed: model,
+      };
+    } catch (err: any) {
+      lastError = err;
+      const errMsg = err?.message || String(err);
+      console.warn(
+        `[Gemini] Model '${model}' failed or timed out: ${errMsg.slice(0, 100)}... trying next model.`
+      );
+      // Wait 300ms before trying next model
+      await wait(300);
     }
   }
 
-  // All models and attempts exhausted
+  // All models exhausted
   throw lastError || new Error("All Gemini models were unavailable due to high demand.");
 }

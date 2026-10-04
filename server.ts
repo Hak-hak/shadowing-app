@@ -119,7 +119,14 @@ ${rawText}
           },
         });
 
-        const parsed = JSON.parse(response.text || "{}");
+        let rawJson = (response.text || "{}").trim();
+        if (rawJson.startsWith("```json")) {
+          rawJson = rawJson.replace(/^```json\s*/, "").replace(/\s*```$/, "").trim();
+        } else if (rawJson.startsWith("```")) {
+          rawJson = rawJson.replace(/^```\s*/, "").replace(/\s*```$/, "").trim();
+        }
+
+        const parsed = JSON.parse(rawJson);
 
         // Validate and ensure terminal punctuation on last word of each sentence
         if (Array.isArray(parsed.sentences)) {

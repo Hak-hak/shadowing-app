@@ -76,6 +76,75 @@ export const CreateLesson: React.FC<CreateLessonProps> = ({ onLessonCreated, onC
     }
   };
 
+  // Fallback parser on client when network or server is slow/offline
+  const parseLessonLocally = (text: string, lessonTitle?: string, lessonTopic?: string, lessonGrade?: string): PreviewData => {
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const sentences: SentenceItem[] = [];
+    let currentId = 1;
+
+    for (const line of lines) {
+      let speaker = 'A';
+      let content = line;
+
+      const speakerMatch = line.match(/^([A-Za-z0-9\s]+)[:：]\s*(.+)$/);
+      if (speakerMatch) {
+        speaker = speakerMatch[1].trim();
+        content = speakerMatch[2].trim();
+      } else if (sentences.length > 0) {
+        const prev = sentences[sentences.length - 1].speaker;
+        speaker = prev === 'A' ? 'B' : 'A';
+      }
+
+      const parts = content.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [content];
+
+      for (const part of parts) {
+        let cleanPart = part.trim();
+        if (!cleanPart) continue;
+
+        if (!/[.?!]$/.test(cleanPart)) {
+          const isQuestion = /^(\s*(what|where|when|why|who|whom|whose|which|how|do|does|did|are|is|am|was|were|can|could|will|would|shall|should|have|has|had|may|might))\b/i.test(cleanPart);
+          cleanPart += isQuestion ? '?' : '.';
+        }
+
+        const endingMatch = cleanPart.match(/([.?!]+)$/);
+        const endingPunct = endingMatch ? endingMatch[1] : '.';
+        const rawTokens = cleanPart.split(/\s+/).filter(Boolean);
+
+        const words = rawTokens.map((w, idx) => {
+          const punctMatch = w.match(/([,;:!?.…]+)$/);
+          const cleaned = w.replace(/^[.,/#!$%^&*;:{}=\-_`~()?"']+|[.,/#!$%^&*;:{}=\-_`~()?"']+$/g, '');
+          return {
+            text: cleaned || w,
+            punctuation: idx === rawTokens.length - 1 ? endingPunct : (punctMatch ? punctMatch[1] : undefined),
+          };
+        });
+
+        sentences.push({
+          id: currentId++,
+          speaker,
+          english: cleanPart,
+          vietnamese: '',
+          words,
+        });
+      }
+    }
+
+    return {
+      lessonTitle: lessonTitle || 'Bài học luyện nói mới',
+      topic: lessonTopic || 'Giao tiếp tiếng Anh',
+      grade: lessonGrade || 'Lớp 7',
+      sentences: sentences.length > 0 ? sentences : [
+        {
+          id: 1,
+          speaker: 'Speaker',
+          english: text,
+          vietnamese: '',
+          words: text.split(/\s+/).map((w) => ({ text: w })),
+        },
+      ],
+    };
+  };
+
   const handleGeneratePreview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rawText.trim()) {
@@ -87,9 +156,14 @@ export const CreateLesson: React.FC<CreateLessonProps> = ({ onLessonCreated, onC
     setIsGenerating(true);
 
     try {
+      // 12-second abort timeout so user is never frozen waiting for slow requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
       const response = await fetch('/api/ai/generate-lesson', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           rawText,
           title: title.trim(),
@@ -97,22 +171,32 @@ export const CreateLesson: React.FC<CreateLessonProps> = ({ onLessonCreated, onC
           grade,
         }),
       });
+      clearTimeout(timeoutId);
 
-      const result = await response.json();
-      if (result.success && result.data && Array.isArray(result.data.sentences)) {
-        setPreviewData({
-          lessonTitle: result.data.lessonTitle || title || 'Bài học luyện nói mới',
-          topic: result.data.topic || topic || 'Giao tiếp tiếng Anh',
-          grade: result.data.grade || grade,
-          sentences: result.data.sentences,
-        });
-        setStep('preview');
-      } else {
-        setErrorMsg('Không thể xử lý bài học. Vui lòng kiểm tra lại văn bản.');
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data && Array.isArray(result.data.sentences)) {
+          setPreviewData({
+            lessonTitle: result.data.lessonTitle || title || 'Bài học luyện nói mới',
+            topic: result.data.topic || topic || 'Giao tiếp tiếng Anh',
+            grade: result.data.grade || grade,
+            sentences: result.data.sentences,
+          });
+          setStep('preview');
+          return;
+        }
       }
+
+      // If server returned non-200 or unexpected structure, fall back to local parser
+      const fallback = parseLessonLocally(rawText, title.trim(), topic.trim(), grade);
+      setPreviewData(fallback);
+      setStep('preview');
     } catch (err: any) {
-      console.error('Lesson creation error:', err);
-      setErrorMsg('Đã có lỗi xảy ra khi kết nối máy chủ. Hãy thử lại.');
+      console.warn('Network or AI service busy, parsing lesson with integrated parser:', err);
+      // Seamlessly fall back to client-side parser so user flow is never blocked
+      const fallback = parseLessonLocally(rawText, title.trim(), topic.trim(), grade);
+      setPreviewData(fallback);
+      setStep('preview');
     } finally {
       setIsGenerating(false);
     }
