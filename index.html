@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <script>
+      (function() {
+        try {
+          var origFetch = window.fetch;
+          var boundFetch = origFetch ? origFetch.bind(window) : null;
+          var _customFetch = boundFetch;
+
+          var desc = Object.getOwnPropertyDescriptor(window, 'fetch');
+          if (!desc || desc.configurable) {
+            Object.defineProperty(window, 'fetch', {
+              get: function() {
+                return _customFetch || boundFetch;
+              },
+              set: function(val) {
+                _customFetch = typeof val === 'function' ? val : boundFetch;
+              },
+              configurable: true,
+              enumerable: true
+            });
+          }
+        } catch (err) {
+          // Passively ignore if environment locks down window descriptor
+        }
+
+        var isFetchGetterError = function(msg) {
+          return typeof msg === 'string' &&
+            msg.indexOf('fetch') !== -1 &&
+            (msg.indexOf('getter') !== -1 || msg.indexOf('Cannot set property') !== -1);
+        };
+
+        window.addEventListener('error', function(e) {
+          if (e && (isFetchGetterError(e.message) || (e.error && isFetchGetterError(e.error.message)))) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+
+        var prevOnError = window.onerror;
+        window.onerror = function(msg, url, line, col, err) {
+          if (isFetchGetterError(msg) || (err && isFetchGetterError(err.message))) {
+            return true;
+          }
+          if (typeof prevOnError === 'function') {
+            return prevOnError.apply(this, arguments);
+          }
+          return false;
+        };
+      })();
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>English Speaking Practice</title>
+    <meta name="description" content="Ứng dụng luyện nói tiếng Anh tương tác dành cho học sinh Việt Nam theo phương pháp Listen - Read - Repeat - Shadowing với highlight từ thời gian thực và phân tích bài học AI." />
+    <meta property="og:title" content="English Speaking Practice" />
+    <meta property="og:description" content="Ứng dụng luyện nói tiếng Anh tương tác dành cho học sinh Việt Nam theo phương pháp Listen - Read - Repeat - Shadowing với highlight từ thời gian thực và phân tích bài học AI." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body class="font-sans antialiased text-slate-800 bg-slate-50 min-h-screen">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

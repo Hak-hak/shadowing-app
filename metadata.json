@@ -1,0 +1,6 @@
+{
+  "name": "English Speaking Practice",
+  "description": "Ứng dụng luyện nói tiếng Anh tương tác dành cho học sinh Việt Nam theo phương pháp Listen - Read - Repeat - Shadowing với highlight từ thời gian thực và phân tích bài học AI.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
